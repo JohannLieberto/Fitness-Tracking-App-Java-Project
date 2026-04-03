@@ -33,7 +33,6 @@ public class WorkoutDataManager {
         Path dataPath = Path.of(DATA_DIR);
         Path backupPath = Path.of(BACKUP_DIR);
 
-        // Files.createDirectories is idempotent — safe to call every run
         if (!Files.exists(dataPath)) {
             Files.createDirectories(dataPath);
             System.out.println("  [NIO2] Created data directory: " + dataPath.toAbsolutePath());
@@ -51,7 +50,6 @@ public class WorkoutDataManager {
         initialise();
         Path filePath = Path.of(HISTORY_FILE);
 
-        // NIO2: open for writing, create or truncate
         try (BufferedWriter writer = Files.newBufferedWriter(
                 filePath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
@@ -64,7 +62,7 @@ public class WorkoutDataManager {
                         session.sessionId(),
                         session.date().format(DATE_FMT),
                         session.type().name(),
-                        String.valueOf(session.durationMinutes()),
+                        String.valueOf(session.totalDuration()),    // fixed: was durationMinutes()
                         String.format("%.0f", session.calculateTotalCalories()),
                         session.notes().replace(",", ";")
                 );
@@ -87,10 +85,9 @@ public class WorkoutDataManager {
             return rows;
         }
 
-        // NIO2: stream all lines, skip header
         try (BufferedReader reader = Files.newBufferedReader(filePath)) {
-            reader.lines()          // Stream<String>
-                  .skip(1)          // skip CSV header row
+            reader.lines()
+                  .skip(1)
                   .map(line -> line.split(","))
                   .forEach(rows::add);
         }

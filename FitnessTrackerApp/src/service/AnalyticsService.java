@@ -53,7 +53,7 @@ public class AnalyticsService {
             // Task 2 — average session duration in minutes
             () -> {
                 double avg = sessions.stream()
-                        .mapToInt(WorkoutSession::durationMinutes)
+                        .mapToInt(WorkoutSession::totalDuration)   // fixed: was durationMinutes()
                         .average()
                         .orElse(0.0);
                 return new AnalyticsResult("Avg Session Duration", avg, "min");
@@ -88,7 +88,7 @@ public class AnalyticsService {
             () -> {
                 double efficiency = sessions.stream()
                         .mapToDouble(s -> s.calculateTotalCalories() /
-                                Math.max(1, s.durationMinutes()))
+                                Math.max(1, s.totalDuration()))     // fixed: was durationMinutes()
                         .average()
                         .orElse(0.0);
                 return new AnalyticsResult("Avg Efficiency", efficiency, "kcal/min");

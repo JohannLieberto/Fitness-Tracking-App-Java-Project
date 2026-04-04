@@ -2,26 +2,19 @@ package service;
 
 import model.*;
 import exception.InvalidWorkoutException;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
  * Implementation of FitnessService demonstrating:
- * - Inheritance (implements interface)
- * - Polymorphism
- * - Lambdas and Predicate
- * - Method references
- * - Comparator.comparing / thenComparing / reversed (OOP2: sorting)
- * - Switch expressions (standard, no preview features required)
- * - Pattern matching via instanceof (Java 16+, standard)
+ *  - Comparator.comparing / thenComparing / reversed  (OOP2: sorting)
+ *  - Lambdas: Predicate, method references
+ *  - Switch expressions on enum  (standard, no preview needed)
+ *  - Pattern matching instanceof  (Java 16+, standard)
  */
 public class FitnessServiceImpl implements FitnessService {
 
-    // ----------------------------------------------------------------
-    // Enum used as a sort key — clean alternative to magic strings
-    // ----------------------------------------------------------------
     public enum WorkoutSortKey { DATE, DURATION, CALORIES }
 
     private final Map<String, User> users;
@@ -53,48 +46,26 @@ public class FitnessServiceImpl implements FitnessService {
 
     // ----------------------------------------------------------------
     // SORTING — Comparator.comparing, thenComparing, reversed
-    //
-    // Fix: avoid chaining .reversed() after comparingInt() — Java loses
-    // the concrete type parameter at that point and cannot infer
-    // ToIntFunction<? super T> for the next comparingInt() call.
-    // Solution: use explicit lambda comparators (a, b) -> ... for
-    // tie-breakers so no type inference is required.
+    // WorkoutSession is now a record so date(), durationMinutes(),
+    // calculateTotalCalories() are all valid accessor / instance methods.
     // ----------------------------------------------------------------
-
-    /**
-     * Returns the user's workout history sorted by the given key.
-     *
-     * DATE     → newest first; tie-break: longest duration first
-     * DURATION → longest first; tie-break: newest date first
-     * CALORIES → most calories first; tie-break: newest date first
-     *
-     * Demonstrates:
-     *   - Comparator.comparing with method reference
-     *   - .reversed() for descending order
-     *   - .thenComparing() with explicit lambda for secondary sort key
-     */
     public List<WorkoutSession> getWorkoutsSortedBy(String userId, WorkoutSortKey key) {
         var user = users.get(userId);
         if (user == null) return Collections.emptyList();
 
         Comparator<WorkoutSession> comparator = switch (key) {
             case DATE ->
-                // Primary: newest date first
-                // Tie-break: longest duration first — lambda avoids type-inference issue
                 Comparator.comparing(WorkoutSession::date)
                           .reversed()
-                          .thenComparing((a, b) -> Integer.compare(b.durationMinutes(), a.durationMinutes()));
+                          .thenComparing((a, b) ->
+                              Integer.compare(b.durationMinutes(), a.durationMinutes()));
 
             case DURATION ->
-                // Primary: longest duration first
-                // Tie-break: newest date first
                 Comparator.<WorkoutSession>comparingInt(WorkoutSession::durationMinutes)
                           .reversed()
                           .thenComparing((a, b) -> b.date().compareTo(a.date()));
 
             case CALORIES ->
-                // Primary: most calories first
-                // Tie-break: newest date first
                 Comparator.<WorkoutSession>comparingDouble(WorkoutSession::calculateTotalCalories)
                           .reversed()
                           .thenComparing((a, b) -> b.date().compareTo(a.date()));
@@ -111,9 +82,7 @@ public class FitnessServiceImpl implements FitnessService {
     @Override
     public List<WorkoutSession> filterWorkouts(String userId, Predicate<WorkoutSession> criteria) {
         var user = users.get(userId);
-        if (user == null) {
-            return Collections.emptyList();
-        }
+        if (user == null) return Collections.emptyList();
         return user.getWorkoutHistory().stream()
                 .filter(criteria)
                 .collect(Collectors.toList());
@@ -133,9 +102,7 @@ public class FitnessServiceImpl implements FitnessService {
                 .collect(Collectors.toList());
     }
 
-    // ----------------------------------------------------------------
     // Switch expression on enum — no preview needed
-    // ----------------------------------------------------------------
     public String getWorkoutRecommendation(WorkoutType type) {
         return switch (type) {
             case CARDIO      -> "Great for heart health! Aim for 150 minutes per week.";
@@ -146,9 +113,7 @@ public class FitnessServiceImpl implements FitnessService {
         };
     }
 
-    /**
-     * Pattern matching with instanceof (Java 16+, fully released — no preview flags needed).
-     */
+    // Pattern matching with instanceof (Java 16+, fully released)
     public String analyzeExercise(Exercise exercise) {
         if (exercise instanceof CardioExercise cardio) {
             return String.format("Cardio workout: %s covering %.2f km",

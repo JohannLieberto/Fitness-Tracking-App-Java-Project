@@ -1,31 +1,41 @@
 package model;
 
-import java.time.Duration;
 import java.time.LocalDate;
 
 /**
- * Immutable DTO summarising a single day's workout data.
- * Demonstrates: Records (OOP2 Fundamentals)
+ * WorkoutSummary — a record used as an immutable summary DTO.
+ *
+ * OOP2: Records (JEP 395)
+ * - Auto-generates: private final fields, canonical constructor,
+ *   accessor methods, equals(), hashCode(), toString()
  */
 public record WorkoutSummary(
+        String sessionId,
         LocalDate date,
-        int totalCalories,
-        Duration totalDuration
+        WorkoutType workoutType,
+        int durationMinutes,
+        int caloriesBurned,
+        String notes
 ) {
-    /** Compact canonical constructor — validation before field assignment */
+    // Compact constructor for validation
     public WorkoutSummary {
-        if (totalCalories < 0) throw new IllegalArgumentException("Calories cannot be negative");
-        if (totalDuration == null) throw new IllegalArgumentException("Duration must not be null");
+        if (durationMinutes < 0)
+            throw new IllegalArgumentException("Duration cannot be negative");
+        if (caloriesBurned < 0)
+            throw new IllegalArgumentException("Calories cannot be negative");
+        notes = (notes == null) ? "" : notes.trim();
     }
 
-    /** Convenience factory */
-    public static WorkoutSummary of(LocalDate date, int calories, long minutes) {
-        return new WorkoutSummary(date, calories, Duration.ofMinutes(minutes));
+    /** Convenience: calories as double */
+    public double totalCalories() {
+        return caloriesBurned;
     }
 
     @Override
     public String toString() {
-        return String.format("WorkoutSummary[date=%s, calories=%d, duration=%dm]",
-                date, totalCalories, totalDuration.toMinutes());
+        return String.format("Session %s on %s: %s - %d min, %d cal%s",
+                sessionId, date, workoutType.getDisplayName(),
+                durationMinutes, caloriesBurned,
+                notes.isEmpty() ? "" : " (" + notes + ")");
     }
 }

@@ -1,19 +1,15 @@
 package model;
 
 /**
- * A strength training activity — permitted subtype of the sealed Activity interface.
- * Implemented as a record.
+ * Permitted subtype of sealed Activity.
+ * Demonstrates: Sealed classes (OOP2 Fundamentals)
  */
-public record StrengthTraining(String exerciseName, int sets, int reps, double weightKg) implements Activity {
+public record StrengthTraining(String exerciseName, double weightKg, int reps) implements Activity {
+    @Override
+    public String activityType() { return "StrengthTraining"; }
 
     @Override
-    public String name() {
-        return "Strength Training";
-    }
-
-    @Override
-    public int estimatedCalories() {
-        // Simple estimate: 5 kcal per set
-        return sets * 5;
+    public String toString() {
+        return String.format("StrengthTraining[%s %.1f kg x %d reps]", exerciseName, weightKg, reps);
     }
 }

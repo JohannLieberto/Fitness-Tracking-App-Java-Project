@@ -1,19 +1,15 @@
 package model;
 
 /**
- * A cycling activity — permitted subtype of the sealed Activity interface.
- * Implemented as a record.
+ * Permitted subtype of sealed Activity.
+ * Demonstrates: Sealed classes (OOP2 Fundamentals)
  */
-public record Cycling(double distanceKm, int elevationGainM) implements Activity {
+public record Cycling(double distanceKm, double speedKmh) implements Activity {
+    @Override
+    public String activityType() { return "Cycling"; }
 
     @Override
-    public String name() {
-        return "Cycling";
-    }
-
-    @Override
-    public int estimatedCalories() {
-        // Simple estimate: 30 kcal per km + 10 kcal per 100m elevation
-        return (int) (distanceKm * 30 + (elevationGainM / 100.0) * 10);
+    public String toString() {
+        return String.format("Cycling[%.1f km @ %.1f km/h]", distanceKm, speedKmh);
     }
 }

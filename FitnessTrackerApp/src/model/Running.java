@@ -1,19 +1,15 @@
 package model;
 
 /**
- * A running activity — permitted subtype of the sealed Activity interface.
- * Implemented as a record for immutability and compact syntax (also demos Records).
+ * Permitted subtype of sealed Activity.
+ * Demonstrates: Sealed classes (OOP2 Fundamentals)
  */
-public record Running(double distanceKm, double paceKmh) implements Activity {
+public record Running(double distanceKm, double paceMinPerKm) implements Activity {
+    @Override
+    public String activityType() { return "Running"; }
 
     @Override
-    public String name() {
-        return "Running";
-    }
-
-    @Override
-    public int estimatedCalories() {
-        // Simple estimate: 60 kcal per km
-        return (int) (distanceKm * 60);
+    public String toString() {
+        return String.format("Running[%.1f km @ %.1f min/km]", distanceKm, paceMinPerKm);
     }
 }

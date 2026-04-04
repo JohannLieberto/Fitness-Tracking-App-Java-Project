@@ -1,50 +1,36 @@
 package model;
 
 import java.time.LocalDate;
-import java.util.List;
 
 /**
- * Record demonstrating Java 16+ record feature
- * Immutable data carrier for workout sessions
+ * Core domain class representing a single workout session.
  */
-public record WorkoutSession(
-    String sessionId,
-    LocalDate date,
-    WorkoutType type,
-    List<Exercise> exercises,
-    int totalDuration,
-    String notes
-) {
-    // Compact constructor for validation
-    public WorkoutSession {
-        if (sessionId == null || sessionId.isBlank()) {
-            throw new IllegalArgumentException("Session ID cannot be null or empty");
-        }
-        if (date == null) {
-            throw new IllegalArgumentException("Date cannot be null");
-        }
-        if (totalDuration < 0) {
-            throw new IllegalArgumentException("Duration cannot be negative");
-        }
-        // Defensive copying for mutable list
-        exercises = List.copyOf(exercises);
+public class WorkoutSession {
+
+    private final String name;
+    private final LocalDate date;
+    private final int durationMinutes;
+    private final int caloriesBurned;
+    private final WorkoutType workoutType;
+
+    public WorkoutSession(String name, LocalDate date, int durationMinutes,
+                          int caloriesBurned, WorkoutType workoutType) {
+        this.name = name;
+        this.date = date;
+        this.durationMinutes = durationMinutes;
+        this.caloriesBurned = caloriesBurned;
+        this.workoutType = workoutType;
     }
 
-    // Additional methods
-    public double calculateTotalCalories() {
-        return exercises.stream()
-            .mapToDouble(Exercise::calculateCaloriesBurned)
-            .sum();
-    }
+    public String getName()            { return name; }
+    public LocalDate getDate()         { return date; }
+    public int getDurationMinutes()    { return durationMinutes; }
+    public int getCaloriesBurned()     { return caloriesBurned; }
+    public WorkoutType getWorkoutType(){ return workoutType; }
 
-    public int getExerciseCount() {
-        return exercises.size();
-    }
-
-    public String getSummary() {
-        return String.format("Session %s on %s: %s - %d exercises, %d min, %.0f cal", 
-            sessionId, date, type, getExerciseCount(), totalDuration, calculateTotalCalories());
+    @Override
+    public String toString() {
+        return String.format("WorkoutSession[name='%s', date=%s, duration=%dmin, calories=%d, type=%s]",
+                name, date, durationMinutes, caloriesBurned, workoutType);
     }
 }
-
-

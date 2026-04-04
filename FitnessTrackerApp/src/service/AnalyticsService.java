@@ -1,129 +1,73 @@
 package service;
 
 import model.WorkoutSession;
-import model.WorkoutType;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 /**
- * OOP2 - CONCURRENCY DEMO
- * Demonstrates: ExecutorService, Callable, Future, invokeAll
- *
- * Uses a thread pool to compute multiple fitness analytics tasks
- * in parallel, simulating a real reporting workload.
+ * Demonstrates OOP2 Advanced: Concurrency
+ *   - ExecutorService (fixed thread pool)
+ *   - Callable<AnalysisResult>
+ *   - invokeAll() + Future<T>
  */
 public class AnalyticsService {
 
-    // ----------------------------------------------------------------
-    // Result record — immutable data carrier from each Callable task
-    // ----------------------------------------------------------------
-    public record AnalyticsResult(String metricName, double value, String unit) {
-        @Override
-        public String toString() {
-            return String.format("  %-35s  %.2f %s", metricName, value, unit);
+    /** Value object returned by each parallel task */
+    public record AnalysisResult(String metricName, String value) {
+        @Override public String toString() {
+            return String.format("  %-28s : %s", metricName, value);
         }
     }
 
-    /**
-     * Runs several analytics tasks concurrently and collects results.
-     *
-     * @param sessions the full workout history to analyse
-     * @return list of completed AnalyticsResult objects
-     */
-    public List<AnalyticsResult> runConcurrentAnalytics(List<WorkoutSession> sessions) {
+    public void runAnalytics(List<WorkoutSession> workouts) throws InterruptedException {
+        System.out.println("\n=== [CONCURRENCY] ExecutorService + Callable + invokeAll ===");
 
-        // Fixed thread pool — one thread per logical CPU core
-        ExecutorService executor = Executors.newFixedThreadPool(
-                Runtime.getRuntime().availableProcessors());
+        // Immutable snapshot — avoids ConcurrentModificationException
+        List<WorkoutSession> snapshot = Collections.unmodifiableList(new ArrayList<>(workouts));
 
-        // Define independent tasks as Callable lambdas
-        List<Callable<AnalyticsResult>> tasks = List.of(
+        List<Callable<AnalysisResult>> tasks = List.of(
+                () -> new AnalysisResult("Total calories",
+                        String.valueOf(snapshot.stream().mapToInt(WorkoutSession::getCaloriesBurned).sum())),
 
-            // Task 1 — total calories across all sessions
-            () -> {
-                double total = sessions.stream()
-                        .mapToDouble(WorkoutSession::calculateTotalCalories)
-                        .sum();
-                return new AnalyticsResult("Total Calories Burned", total, "kcal");
-            },
+                () -> new AnalysisResult("Avg duration (min)",
+                        String.format("%.1f", snapshot.stream()
+                                .mapToInt(WorkoutSession::getDurationMinutes).average().orElse(0))),
 
-            // Task 2 — average session duration in minutes
-            () -> {
-                double avg = sessions.stream()
-                        .mapToInt(WorkoutSession::totalDuration)   // fixed: was durationMinutes()
-                        .average()
-                        .orElse(0.0);
-                return new AnalyticsResult("Avg Session Duration", avg, "min");
-            },
+                () -> new AnalysisResult("Longest session",
+                        snapshot.stream()
+                                .max(Comparator.comparing(WorkoutSession::getDurationMinutes))
+                                .map(w -> w.getName() + " (" + w.getDurationMinutes() + "min)")
+                                .orElse("none")),
 
-            // Task 3 — longest single session (calories)
-            () -> {
-                double max = sessions.stream()
-                        .mapToDouble(WorkoutSession::calculateTotalCalories)
-                        .max()
-                        .orElse(0.0);
-                return new AnalyticsResult("Best Session (Calories)", max, "kcal");
-            },
+                () -> new AnalysisResult("Session count",
+                        String.valueOf(snapshot.size())),
 
-            // Task 4 — cardio session count
-            () -> {
-                long cardioCount = sessions.stream()
-                        .filter(s -> s.type() == WorkoutType.CARDIO)
-                        .count();
-                return new AnalyticsResult("Cardio Sessions", cardioCount, "sessions");
-            },
+                () -> new AnalysisResult("Unique workout types",
+                        snapshot.stream()
+                                .map(w -> w.getWorkoutType().name())
+                                .distinct()
+                                .sorted()
+                                .collect(Collectors.joining(", "))),
 
-            // Task 5 — strength session count
-            () -> {
-                long strengthCount = sessions.stream()
-                        .filter(s -> s.type() == WorkoutType.STRENGTH)
-                        .count();
-                return new AnalyticsResult("Strength Sessions", strengthCount, "sessions");
-            },
-
-            // Task 6 — calories-per-minute efficiency
-            () -> {
-                double efficiency = sessions.stream()
-                        .mapToDouble(s -> s.calculateTotalCalories() /
-                                Math.max(1, s.totalDuration()))     // fixed: was durationMinutes()
-                        .average()
-                        .orElse(0.0);
-                return new AnalyticsResult("Avg Efficiency", efficiency, "kcal/min");
-            }
+                () -> new AnalysisResult("Most recent session",
+                        snapshot.stream()
+                                .max(Comparator.comparing(WorkoutSession::getDate))
+                                .map(w -> w.getName() + " on " + w.getDate())
+                                .orElse("none"))
         );
 
-        List<AnalyticsResult> results = new java.util.ArrayList<>();
+        ExecutorService pool = Executors.newFixedThreadPool(4);
         try {
-            // invokeAll blocks until ALL tasks finish (or timeout)
-            List<Future<AnalyticsResult>> futures = executor.invokeAll(tasks);
-
-            for (Future<AnalyticsResult> future : futures) {
-                results.add(future.get());   // get() retrieves result; throws on task failure
+            List<Future<AnalysisResult>> futures = pool.invokeAll(tasks);
+            for (Future<AnalysisResult> future : futures) {
+                System.out.println(future.get());
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            System.err.println("Analytics interrupted: " + e.getMessage());
         } catch (ExecutionException e) {
             System.err.println("Analytics task failed: " + e.getCause().getMessage());
         } finally {
-            executor.shutdown();  // Always release the thread pool
+            pool.shutdown();
         }
-
-        return results;
-    }
-
-    /**
-     * Groups sessions by WorkoutType and returns a summary map.
-     * Uses Collectors.groupingBy + summingDouble — stream terminal op.
-     */
-    public Map<WorkoutType, Double> caloriesByType(List<WorkoutSession> sessions) {
-        return sessions.stream()
-                .collect(Collectors.groupingBy(
-                        WorkoutSession::type,
-                        Collectors.summingDouble(WorkoutSession::calculateTotalCalories)
-                ));
     }
 }

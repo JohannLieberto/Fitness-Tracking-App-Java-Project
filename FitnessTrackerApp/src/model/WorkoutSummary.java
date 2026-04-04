@@ -3,11 +3,8 @@ package model;
 import java.time.LocalDate;
 
 /**
- * WorkoutSummary — a record used as an immutable summary DTO.
- *
+ * WorkoutSummary — immutable summary DTO record.
  * OOP2: Records (JEP 395)
- * - Auto-generates: private final fields, canonical constructor,
- *   accessor methods, equals(), hashCode(), toString()
  */
 public record WorkoutSummary(
         String sessionId,
@@ -17,7 +14,6 @@ public record WorkoutSummary(
         int caloriesBurned,
         String notes
 ) {
-    // Compact constructor for validation
     public WorkoutSummary {
         if (durationMinutes < 0)
             throw new IllegalArgumentException("Duration cannot be negative");
@@ -26,7 +22,12 @@ public record WorkoutSummary(
         notes = (notes == null) ? "" : notes.trim();
     }
 
-    /** Convenience: calories as double */
+    /** Convenience factory — creates a summary from date + totals (used in WorkoutService.showRecords) */
+    public static WorkoutSummary of(LocalDate date, int totalCalories, int totalMinutes) {
+        return new WorkoutSummary("SUMMARY", date, WorkoutType.CARDIO, totalMinutes, totalCalories, "");
+    }
+
+    /** Calories as double */
     public double totalCalories() {
         return caloriesBurned;
     }

@@ -21,24 +21,31 @@ public class AnalyticsService {
         }
     }
 
+    /**
+     * Runs parallel analytics using ExecutorService + Callable.
+     * Called as runAnalytics() from WorkoutService and runParallelAnalysis() from Main.
+     */
+    public void runParallelAnalysis(List<WorkoutSession> workouts) throws InterruptedException {
+        runAnalytics(workouts);
+    }
+
     public void runAnalytics(List<WorkoutSession> workouts) throws InterruptedException {
         System.out.println("\n=== [CONCURRENCY] ExecutorService + Callable + invokeAll ===");
 
-        // Immutable snapshot — avoids ConcurrentModificationException
         List<WorkoutSession> snapshot = Collections.unmodifiableList(new ArrayList<>(workouts));
 
         List<Callable<AnalysisResult>> tasks = List.of(
                 () -> new AnalysisResult("Total calories",
-                        String.valueOf(snapshot.stream().mapToInt(WorkoutSession::getCaloriesBurned).sum())),
+                        String.valueOf(snapshot.stream().mapToInt(WorkoutSession::caloriesBurned).sum())),
 
                 () -> new AnalysisResult("Avg duration (min)",
                         String.format("%.1f", snapshot.stream()
-                                .mapToInt(WorkoutSession::getDurationMinutes).average().orElse(0))),
+                                .mapToInt(WorkoutSession::durationMinutes).average().orElse(0))),
 
                 () -> new AnalysisResult("Longest session",
                         snapshot.stream()
-                                .max(Comparator.comparing(WorkoutSession::getDurationMinutes))
-                                .map(w -> w.getName() + " (" + w.getDurationMinutes() + "min)")
+                                .max(Comparator.comparing(WorkoutSession::durationMinutes))
+                                .map(w -> w.sessionId() + " (" + w.durationMinutes() + "min)")
                                 .orElse("none")),
 
                 () -> new AnalysisResult("Session count",
@@ -46,15 +53,15 @@ public class AnalyticsService {
 
                 () -> new AnalysisResult("Unique workout types",
                         snapshot.stream()
-                                .map(w -> w.getWorkoutType().name())
+                                .map(w -> w.workoutType().name())
                                 .distinct()
                                 .sorted()
                                 .collect(Collectors.joining(", "))),
 
                 () -> new AnalysisResult("Most recent session",
                         snapshot.stream()
-                                .max(Comparator.comparing(WorkoutSession::getDate))
-                                .map(w -> w.getName() + " on " + w.getDate())
+                                .max(Comparator.comparing(WorkoutSession::date))
+                                .map(w -> w.sessionId() + " on " + w.date())
                                 .orElse("none"))
         );
 

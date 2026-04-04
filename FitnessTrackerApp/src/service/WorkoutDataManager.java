@@ -34,6 +34,18 @@ public class WorkoutDataManager {
         this.dataFile = dataDir.resolve(DATA_FILE);
     }
 
+    /**
+     * Convenience method called from FitnessTrackerMain.
+     * Runs export, list backups in sequence.
+     */
+    public void demonstrateNIO2(List<WorkoutSession> workouts, String userId) throws IOException {
+        System.out.println("User: " + userId);
+        exportToCsv(workouts);
+        listBackups();
+        List<WorkoutSession> imported = importFromCsv();
+        System.out.println("  Re-imported " + imported.size() + " session(s).");
+    }
+
     // ── EXPORT ────────────────────────────────────────────────────
 
     public void exportToCsv(List<WorkoutSession> workouts) throws IOException {
@@ -41,7 +53,6 @@ public class WorkoutDataManager {
 
         Files.createDirectories(dataDir);
 
-        // Backup existing file before overwriting
         if (Files.exists(dataFile)) {
             String timestamp = LocalDateTime.now().format(BACKUP_FMT);
             Path backup = dataDir.resolve("workouts_backup_" + timestamp + ".csv");
@@ -50,15 +61,17 @@ public class WorkoutDataManager {
         }
 
         try (BufferedWriter writer = Files.newBufferedWriter(dataFile)) {
-            writer.write("name,date,durationMinutes,caloriesBurned,workoutType");
+            writer.write("sessionId,userId,date,durationMinutes,caloriesBurned,workoutType,notes");
             writer.newLine();
             for (WorkoutSession w : workouts) {
                 writer.write(String.join(",",
-                        w.getName(),
-                        w.getDate().toString(),
-                        String.valueOf(w.getDurationMinutes()),
-                        String.valueOf(w.getCaloriesBurned()),
-                        w.getWorkoutType().name()));
+                        w.sessionId(),
+                        w.userId(),
+                        w.date().toString(),
+                        String.valueOf(w.durationMinutes()),
+                        String.valueOf(w.caloriesBurned()),
+                        w.workoutType().name(),
+                        w.notes().replace(",", ";")));
                 writer.newLine();
             }
         }
@@ -81,14 +94,16 @@ public class WorkoutDataManager {
             boolean header = true;
             while ((line = reader.readLine()) != null) {
                 if (header) { header = false; continue; }
-                String[] parts = line.split(",");
-                if (parts.length < 5) continue;
+                String[] parts = line.split(",", -1);
+                if (parts.length < 7) continue;
                 WorkoutSession ws = new WorkoutSession(
-                        parts[0],
-                        LocalDate.parse(parts[1]),
-                        Integer.parseInt(parts[2]),
-                        Integer.parseInt(parts[3]),
-                        WorkoutType.valueOf(parts[4])
+                        parts[0],                          // sessionId
+                        parts[1],                          // userId
+                        LocalDate.parse(parts[2]),         // date
+                        WorkoutType.valueOf(parts[5]),     // workoutType
+                        Integer.parseInt(parts[3]),        // durationMinutes
+                        Integer.parseInt(parts[4]),        // caloriesBurned
+                        parts[6]                           // notes
                 );
                 result.add(ws);
             }

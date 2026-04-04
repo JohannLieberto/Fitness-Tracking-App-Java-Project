@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
  * - Polymorphism
  * - Lambdas and Predicate
  * - Method references
- * - Comparator.comparing / thenComparing / reversed  (OOP2: sorting)
+ * - Comparator.comparing / thenComparing / reversed (OOP2: sorting)
  * - Switch expressions (standard, no preview features required)
  * - Pattern matching via instanceof (Java 16+, standard)
  */
@@ -41,7 +41,8 @@ public class FitnessServiceImpl implements FitnessService {
     }
 
     @Override
-    public void addWorkoutToUser(String userId, WorkoutSession session) throws InvalidWorkoutException {
+    public void addWorkoutToUser(String userId, WorkoutSession session)
+            throws InvalidWorkoutException {
         ValidationService.validateWorkoutSession(session);
         var user = users.get(userId);
         if (user == null) {
@@ -52,19 +53,25 @@ public class FitnessServiceImpl implements FitnessService {
 
     // ----------------------------------------------------------------
     // SORTING — Comparator.comparing, thenComparing, reversed
+    //
+    // Fix: avoid chaining .reversed() after comparingInt() — Java loses
+    // the concrete type parameter at that point and cannot infer
+    // ToIntFunction<? super T> for the next comparingInt() call.
+    // Solution: use explicit lambda comparators (a, b) -> ... for
+    // tie-breakers so no type inference is required.
     // ----------------------------------------------------------------
 
     /**
      * Returns the user's workout history sorted by the given key.
      *
-     * DATE     → newest first   (Comparator.comparing(WorkoutSession::date).reversed())
-     * DURATION → longest first  (thenComparing used as tie-breaker on date)
-     * CALORIES → highest first  (thenComparing used as tie-breaker on date)
+     * DATE     → newest first; tie-break: longest duration first
+     * DURATION → longest first; tie-break: newest date first
+     * CALORIES → most calories first; tie-break: newest date first
      *
      * Demonstrates:
      *   - Comparator.comparing with method reference
      *   - .reversed() for descending order
-     *   - .thenComparing() for secondary sort key
+     *   - .thenComparing() with explicit lambda for secondary sort key
      */
     public List<WorkoutSession> getWorkoutsSortedBy(String userId, WorkoutSortKey key) {
         var user = users.get(userId);
@@ -72,30 +79,30 @@ public class FitnessServiceImpl implements FitnessService {
 
         Comparator<WorkoutSession> comparator = switch (key) {
             case DATE ->
-                // Primary: newest date first; tie-break by duration (longest first)
+                // Primary: newest date first
+                // Tie-break: longest duration first — lambda avoids type-inference issue
                 Comparator.comparing(WorkoutSession::date)
                           .reversed()
-                          .thenComparing(
-                              Comparator.comparingInt(WorkoutSession::durationMinutes).reversed());
+                          .thenComparing((a, b) -> Integer.compare(b.durationMinutes(), a.durationMinutes()));
 
             case DURATION ->
-                // Primary: longest session first; tie-break by date (newest first)
-                Comparator.comparingInt(WorkoutSession::durationMinutes)
+                // Primary: longest duration first
+                // Tie-break: newest date first
+                Comparator.<WorkoutSession>comparingInt(WorkoutSession::durationMinutes)
                           .reversed()
-                          .thenComparing(
-                              Comparator.comparing(WorkoutSession::date).reversed());
+                          .thenComparing((a, b) -> b.date().compareTo(a.date()));
 
             case CALORIES ->
-                // Primary: most calories first; tie-break by date (newest first)
-                Comparator.comparingDouble(WorkoutSession::calculateTotalCalories)
+                // Primary: most calories first
+                // Tie-break: newest date first
+                Comparator.<WorkoutSession>comparingDouble(WorkoutSession::calculateTotalCalories)
                           .reversed()
-                          .thenComparing(
-                              Comparator.comparing(WorkoutSession::date).reversed());
+                          .thenComparing((a, b) -> b.date().compareTo(a.date()));
         };
 
         return user.getWorkoutHistory().stream()
-                   .sorted(comparator)
-                   .collect(Collectors.toList());
+                .sorted(comparator)
+                .collect(Collectors.toList());
     }
 
     // ----------------------------------------------------------------
@@ -108,8 +115,8 @@ public class FitnessServiceImpl implements FitnessService {
             return Collections.emptyList();
         }
         return user.getWorkoutHistory().stream()
-            .filter(criteria)
-            .collect(Collectors.toList());
+                .filter(criteria)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -121,9 +128,9 @@ public class FitnessServiceImpl implements FitnessService {
 
     public List<String> getUserNames() {
         return users.values().stream()
-            .map(User::getName)
-            .sorted()
-            .collect(Collectors.toList());
+                .map(User::getName)
+                .sorted()
+                .collect(Collectors.toList());
     }
 
     // ----------------------------------------------------------------
@@ -145,10 +152,10 @@ public class FitnessServiceImpl implements FitnessService {
     public String analyzeExercise(Exercise exercise) {
         if (exercise instanceof CardioExercise cardio) {
             return String.format("Cardio workout: %s covering %.2f km",
-                cardio.getName(), cardio.getDistance());
+                    cardio.getName(), cardio.getDistance());
         } else if (exercise instanceof StrengthExercise strength) {
             return String.format("Strength training: %s with %.1f kg",
-                strength.getName(), strength.getWeight());
+                    strength.getName(), strength.getWeight());
         } else if (exercise == null) {
             return "No exercise provided";
         } else {

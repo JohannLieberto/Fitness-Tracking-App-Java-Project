@@ -6,14 +6,16 @@ import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Main application demonstrating ALL required Java features.
  *
  * OOP2 Additions vs OOP1:
- *  - Concurrency:    demonstrateConcurrency()   -> service.AnalyticsService
+ *  - Sorting:        demonstrateSorting()        -> Comparator.comparing / thenComparing
+ *  - Concurrency:    demonstrateConcurrency()    -> service.AnalyticsService
  *  - NIO2:           demonstrateNio2()           -> service.WorkoutDataManager
- *  - Localisation:   demonstrateLocalisation()  -> i18n/messages_*.properties
+ *  - Localisation:   demonstrateLocalisation()   -> i18n/messages_*.properties
  *  - Java 25 demo:   Java25Demo (separate file, see compile instructions)
  */
 public class FitnessTrackerMain {
@@ -43,6 +45,9 @@ public class FitnessTrackerMain {
             sep();
 
             // ---- NEW OOP2 SECTIONS ----
+            demonstrateSorting(service);
+            sep();
+
             demonstrateConcurrency(service);
             sep();
 
@@ -61,17 +66,70 @@ public class FitnessTrackerMain {
     }
 
     // ----------------------------------------------------------------
+    // SORTING — Comparator.comparing, thenComparing, reversed
+    // ----------------------------------------------------------------
+    private static void demonstrateSorting(FitnessServiceImpl service) {
+        System.out.println(">>> DEMONSTRATING SORTING (Comparator) <<<\n");
+
+        var user = service.getUser("U003");
+        if (user == null) return;
+        var sessions = user.getWorkoutHistory();
+
+        // 1. Sort by date ascending (oldest first)
+        System.out.println("--- Sort by date (oldest first) ---");
+        sessions.stream()
+                .sorted(Comparator.comparing(WorkoutSession::date))
+                .forEach(s -> System.out.printf("  %s  |  %s  |  %.0f cal%n",
+                        s.date(), s.workoutType().name(),
+                        s.calculateTotalCalories()));
+
+        System.out.println();
+
+        // 2. Sort by calories descending (highest first)
+        System.out.println("--- Sort by calories burned (highest first) ---");
+        sessions.stream()
+                .sorted(Comparator.comparingDouble(WorkoutSession::calculateTotalCalories)
+                                  .reversed())
+                .forEach(s -> System.out.printf("  %.0f cal  |  %s  |  %s%n",
+                        s.calculateTotalCalories(), s.sessionId(), s.date()));
+
+        System.out.println();
+
+        // 3. Sort by workout type name, then by duration (thenComparing)
+        System.out.println("--- Sort by type name, then by duration (thenComparing) ---");
+        sessions.stream()
+                .sorted(Comparator.comparing((WorkoutSession s) -> s.workoutType().name())
+                                  .thenComparingInt(WorkoutSession::durationMinutes))
+                .forEach(s -> System.out.printf("  %-10s  |  %2d min  |  %s%n",
+                        s.workoutType().name(), s.durationMinutes(), s.sessionId()));
+
+        System.out.println();
+
+        // 4. Natural sort on a list of user names (String::compareTo via Comparator.naturalOrder)
+        System.out.println("--- User names sorted naturally ---");
+        service.getUserNames().stream()
+               .sorted(Comparator.naturalOrder())
+               .forEach(name -> System.out.println("  " + name));
+
+        System.out.println();
+
+        // 5. Reverse natural order to show Comparator.reverseOrder()
+        System.out.println("--- User names sorted in reverse ---");
+        service.getUserNames().stream()
+               .sorted(Comparator.reverseOrder())
+               .forEach(name -> System.out.println("  " + name));
+    }
+
+    // ----------------------------------------------------------------
     // CONCURRENCY — ExecutorService, Callable, Future, invokeAll
     // ----------------------------------------------------------------
     private static void demonstrateConcurrency(FitnessServiceImpl service)
             throws InvalidWorkoutException {
         System.out.println(">>> DEMONSTRATING CONCURRENCY <<<\n");
 
-        // Build a richer workout history to make analytics meaningful
         var u = service.getUser("U003");
         if (u == null) return;
 
-        // Add a few extra sessions if the list is thin
         if (u.getWorkoutHistory().size() < 3) {
             Exercise e1 = new CardioExercise("Cycle", 40, 15.0, 140);
             Exercise e2 = new StrengthExercise("Deadlift", 35, 5, 5, 100.0);
@@ -94,7 +152,6 @@ public class FitnessTrackerMain {
         System.out.println("Running " + 6 + " analytics tasks concurrently...");
         System.out.println();
 
-        // --- Submit all Callable tasks via invokeAll ---
         List<AnalyticsService.AnalyticsResult> results =
                 analytics.runConcurrentAnalytics(sessions);
 
@@ -102,7 +159,6 @@ public class FitnessTrackerMain {
         results.forEach(System.out::println);
         System.out.println();
 
-        // --- Bonus: groupingBy calories per workout type ---
         System.out.println("  Calories burned by workout type (groupingBy):");
         analytics.caloriesByType(sessions)
                  .forEach((type, cal) ->
@@ -121,24 +177,19 @@ public class FitnessTrackerMain {
 
         var sessions = user.getWorkoutHistory();
 
-        // 1 — Save workout history to CSV using NIO2 Files.newBufferedWriter
         System.out.println("  1. Saving workout history to CSV...");
         manager.saveWorkoutHistory(user.getUserId(), sessions);
 
-        // 2 — Read it back using NIO2 Files.newBufferedReader
         System.out.println("\n  2. Reading back from CSV...");
         var rows = manager.loadWorkoutHistory();
         rows.forEach(row -> System.out.println("     Row: " + Arrays.toString(row)));
 
-        // 3 — Backup using NIO2 Files.copy + Path
         System.out.println("\n  3. Creating backup...");
         manager.backupHistory();
 
-        // 4 — Walk backup directory with walkFileTree (NIO2)
         System.out.println("\n  4. Listing backup files via walkFileTree...");
         manager.listBackups();
 
-        // 5 — File metadata via BasicFileAttributes (NIO2)
         System.out.println("\n  5. File attributes (BasicFileAttributes)...");
         manager.printFileInfo();
     }
@@ -149,11 +200,9 @@ public class FitnessTrackerMain {
     private static void demonstrateLocalisation() {
         System.out.println(">>> DEMONSTRATING LOCALISATION <<<\n");
 
-        // Locales to demonstrate
         Locale[] locales = { Locale.ENGLISH, Locale.FRENCH };
 
         for (Locale locale : locales) {
-            // Load the correct properties file from i18n/ package
             ResourceBundle bundle = ResourceBundle.getBundle("i18n.messages", locale);
 
             System.out.println("  --- Locale: " + locale.getDisplayLanguage() + " ---");
@@ -161,7 +210,6 @@ public class FitnessTrackerMain {
             System.out.println("  " + bundle.getString("app.subtitle"));
             System.out.println();
 
-            // Menu items
             System.out.println("  Menu:");
             for (String key : List.of("menu.addWorkout", "menu.viewHistory",
                                        "menu.analytics", "menu.goals")) {
@@ -169,7 +217,6 @@ public class FitnessTrackerMain {
             }
             System.out.println();
 
-            // MessageFormat for parameterised messages
             String calMsg = MessageFormat.format(
                     bundle.getString("stats.totalCalories"), 1540);
             String sessionMsg = MessageFormat.format(

@@ -217,7 +217,8 @@ public class FitnessTrackerMain {
         System.out.println("\n--- PATTERN MATCHING WITH SWITCH (Exercise hierarchy) ---");
         Exercise[] exercises = {
             new CardioExercise("Sprint", 15, 2.5, 160.0),
-            new StrengthExercise("Deadlift", 20, 300, 100.0, 5)
+            // StrengthExercise(name, duration, sets, reps, weight) — weight is last arg
+            new StrengthExercise("Deadlift", 20, 5, 3, 100.0)
         };
         for (Exercise ex : exercises) {
             System.out.println(service.analyzeExercise(ex));

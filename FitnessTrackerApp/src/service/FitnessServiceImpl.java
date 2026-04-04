@@ -13,10 +13,16 @@ import java.util.stream.Collectors;
  * - Polymorphism
  * - Lambdas and Predicate
  * - Method references
+ * - Comparator.comparing / thenComparing / reversed  (OOP2: sorting)
  * - Switch expressions (standard, no preview features required)
  * - Pattern matching via instanceof (Java 16+, standard)
  */
 public class FitnessServiceImpl implements FitnessService {
+
+    // ----------------------------------------------------------------
+    // Enum used as a sort key — clean alternative to magic strings
+    // ----------------------------------------------------------------
+    public enum WorkoutSortKey { DATE, DURATION, CALORIES }
 
     private final Map<String, User> users;
 
@@ -44,7 +50,57 @@ public class FitnessServiceImpl implements FitnessService {
         user.addWorkoutSession(session);
     }
 
-    // Demonstrating lambdas and Predicate
+    // ----------------------------------------------------------------
+    // SORTING — Comparator.comparing, thenComparing, reversed
+    // ----------------------------------------------------------------
+
+    /**
+     * Returns the user's workout history sorted by the given key.
+     *
+     * DATE     → newest first   (Comparator.comparing(WorkoutSession::date).reversed())
+     * DURATION → longest first  (thenComparing used as tie-breaker on date)
+     * CALORIES → highest first  (thenComparing used as tie-breaker on date)
+     *
+     * Demonstrates:
+     *   - Comparator.comparing with method reference
+     *   - .reversed() for descending order
+     *   - .thenComparing() for secondary sort key
+     */
+    public List<WorkoutSession> getWorkoutsSortedBy(String userId, WorkoutSortKey key) {
+        var user = users.get(userId);
+        if (user == null) return Collections.emptyList();
+
+        Comparator<WorkoutSession> comparator = switch (key) {
+            case DATE ->
+                // Primary: newest date first; tie-break by duration (longest first)
+                Comparator.comparing(WorkoutSession::date)
+                          .reversed()
+                          .thenComparing(
+                              Comparator.comparingInt(WorkoutSession::durationMinutes).reversed());
+
+            case DURATION ->
+                // Primary: longest session first; tie-break by date (newest first)
+                Comparator.comparingInt(WorkoutSession::durationMinutes)
+                          .reversed()
+                          .thenComparing(
+                              Comparator.comparing(WorkoutSession::date).reversed());
+
+            case CALORIES ->
+                // Primary: most calories first; tie-break by date (newest first)
+                Comparator.comparingDouble(WorkoutSession::calculateTotalCalories)
+                          .reversed()
+                          .thenComparing(
+                              Comparator.comparing(WorkoutSession::date).reversed());
+        };
+
+        return user.getWorkoutHistory().stream()
+                   .sorted(comparator)
+                   .collect(Collectors.toList());
+    }
+
+    // ----------------------------------------------------------------
+    // Lambdas and Predicate
+    // ----------------------------------------------------------------
     @Override
     public List<WorkoutSession> filterWorkouts(String userId, Predicate<WorkoutSession> criteria) {
         var user = users.get(userId);
@@ -70,7 +126,9 @@ public class FitnessServiceImpl implements FitnessService {
             .collect(Collectors.toList());
     }
 
-    // Standard switch expression on enum — no preview needed
+    // ----------------------------------------------------------------
+    // Switch expression on enum — no preview needed
+    // ----------------------------------------------------------------
     public String getWorkoutRecommendation(WorkoutType type) {
         return switch (type) {
             case CARDIO      -> "Great for heart health! Aim for 150 minutes per week.";
@@ -82,9 +140,7 @@ public class FitnessServiceImpl implements FitnessService {
     }
 
     /**
-     * Demonstrates pattern matching with instanceof (Java 16+, standard — no preview flags).
-     * This replaces the preview-only 'case Type var ->' switch syntax from Java 21 preview.
-     * Pattern matching instanceof is a FULLY RELEASED feature since Java 16.
+     * Pattern matching with instanceof (Java 16+, fully released — no preview flags needed).
      */
     public String analyzeExercise(Exercise exercise) {
         if (exercise instanceof CardioExercise cardio) {

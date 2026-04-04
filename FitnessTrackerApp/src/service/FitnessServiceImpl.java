@@ -102,7 +102,7 @@ public class FitnessServiceImpl implements FitnessService {
                 .collect(Collectors.toList());
     }
 
-    // Switch expression on enum — no preview needed
+    // Switch expression on enum — covers ALL WorkoutType constants
     public String getWorkoutRecommendation(WorkoutType type) {
         return switch (type) {
             case CARDIO      -> "Great for heart health! Aim for 150 minutes per week.";
@@ -110,6 +110,7 @@ public class FitnessServiceImpl implements FitnessService {
             case HIIT        -> "Maximum calorie burn! Keep sessions under 30 minutes.";
             case YOGA        -> "Perfect for flexibility and stress relief. Practice daily if possible.";
             case FLEXIBILITY -> "Essential for injury prevention. Stretch after every workout.";
+            case SPORT       -> "Team sports build coordination and cardiovascular fitness. Enjoy the game!";
         };
     }
 

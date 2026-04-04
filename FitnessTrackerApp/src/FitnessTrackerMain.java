@@ -32,7 +32,7 @@ public class FitnessTrackerMain {
             demonstrateBasicFeatures(service);
             sep();
 
-            demonstrateAdvancedFeatures(service);
+            demonstrateAdvancedFeatures(service);   // sessions WS001-WS005 created here
             sep();
 
             demonstrateExceptions(service);
@@ -45,6 +45,7 @@ public class FitnessTrackerMain {
             sep();
 
             // ---- NEW OOP2 SECTIONS ----
+            // NOTE: sorting runs AFTER demonstrateAdvancedFeatures so sessions exist
             demonstrateSorting(service);
             sep();
 
@@ -72,52 +73,48 @@ public class FitnessTrackerMain {
         System.out.println(">>> DEMONSTRATING SORTING (Comparator) <<<\n");
 
         var user = service.getUser("U003");
-        if (user == null) return;
+        if (user == null) { System.out.println("  [SKIP] No user U003 found."); return; }
+
         var sessions = user.getWorkoutHistory();
+        if (sessions.isEmpty()) { System.out.println("  [SKIP] No sessions to sort."); return; }
 
-        // 1. Sort by date ascending (oldest first)
-        System.out.println("--- Sort by date (oldest first) ---");
-        sessions.stream()
-                .sorted(Comparator.comparing(WorkoutSession::date))
-                .forEach(s -> System.out.printf("  %s  |  %s  |  %.0f cal%n",
-                        s.date(), s.workoutType().name(),
-                        s.calculateTotalCalories()));
-
+        // 1. Sort by calories descending — uses service.getWorkoutsSortedBy(CALORIES)
+        System.out.println("--- Sort by calories burned (highest first) [Comparator.comparingDouble + reversed] ---");
+        service.getWorkoutsSortedBy("U003", FitnessServiceImpl.WorkoutSortKey.CALORIES)
+               .forEach(s -> System.out.printf("  %.0f cal  |  %-8s  |  %s%n",
+                       s.calculateTotalCalories(), s.sessionId(), s.date()));
         System.out.println();
 
-        // 2. Sort by calories descending (highest first)
-        System.out.println("--- Sort by calories burned (highest first) ---");
-        sessions.stream()
-                .sorted(Comparator.comparingDouble(WorkoutSession::calculateTotalCalories)
-                                  .reversed())
-                .forEach(s -> System.out.printf("  %.0f cal  |  %s  |  %s%n",
-                        s.calculateTotalCalories(), s.sessionId(), s.date()));
-
+        // 2. Sort by date newest first — uses service.getWorkoutsSortedBy(DATE)
+        System.out.println("--- Sort by date (newest first) [Comparator.comparing + reversed] ---");
+        service.getWorkoutsSortedBy("U003", FitnessServiceImpl.WorkoutSortKey.DATE)
+               .forEach(s -> System.out.printf("  %s  |  %-8s  |  %.0f cal%n",
+                       s.date(), s.sessionId(), s.calculateTotalCalories()));
         System.out.println();
 
-        // 3. Sort by workout type name, then by duration (thenComparing)
-        System.out.println("--- Sort by type name, then by duration (thenComparing) ---");
+        // 3. Sort by duration longest first — uses service.getWorkoutsSortedBy(DURATION)
+        System.out.println("--- Sort by duration (longest first) [Comparator.comparingInt + reversed] ---");
+        service.getWorkoutsSortedBy("U003", FitnessServiceImpl.WorkoutSortKey.DURATION)
+               .forEach(s -> System.out.printf("  %2d min  |  %-8s  |  %s%n",
+                       s.durationMinutes(), s.sessionId(), s.workoutType().name()));
+        System.out.println();
+
+        // 4. Sort inline by type name then duration (thenComparing) — directly on stream
+        System.out.println("--- Sort by type name then duration (thenComparing, inline stream) ---");
         sessions.stream()
                 .sorted(Comparator.comparing((WorkoutSession s) -> s.workoutType().name())
                                   .thenComparingInt(WorkoutSession::durationMinutes))
                 .forEach(s -> System.out.printf("  %-10s  |  %2d min  |  %s%n",
                         s.workoutType().name(), s.durationMinutes(), s.sessionId()));
-
         System.out.println();
 
-        // 4. Natural sort on a list of user names (String::compareTo via Comparator.naturalOrder)
-        System.out.println("--- User names sorted naturally ---");
-        service.getUserNames().stream()
-               .sorted(Comparator.naturalOrder())
-               .forEach(name -> System.out.println("  " + name));
-
-        System.out.println();
-
-        // 5. Reverse natural order to show Comparator.reverseOrder()
-        System.out.println("--- User names sorted in reverse ---");
-        service.getUserNames().stream()
-               .sorted(Comparator.reverseOrder())
-               .forEach(name -> System.out.println("  " + name));
+        // 5. Natural order and reverse order on user names (String comparators)
+        System.out.println("--- User names: natural order vs reverse order ---");
+        var names = service.getUserNames();
+        System.out.print("  Natural : ");
+        System.out.println(names.stream().sorted(Comparator.naturalOrder()).collect(Collectors.joining(", ")));
+        System.out.print("  Reversed: ");
+        System.out.println(names.stream().sorted(Comparator.reverseOrder()).collect(Collectors.joining(", ")));
     }
 
     // ----------------------------------------------------------------
@@ -130,27 +127,10 @@ public class FitnessTrackerMain {
         var u = service.getUser("U003");
         if (u == null) return;
 
-        if (u.getWorkoutHistory().size() < 3) {
-            Exercise e1 = new CardioExercise("Cycle", 40, 15.0, 140);
-            Exercise e2 = new StrengthExercise("Deadlift", 35, 5, 5, 100.0);
-            Exercise e3 = new CardioExercise("Row", 25, 0, 150);
-
-            service.addWorkoutToUser("U003",
-                new WorkoutSession("WS003", LocalDate.now().minusDays(2),
-                    WorkoutType.CARDIO, List.of(e1), 40, "Cycling session"));
-            service.addWorkoutToUser("U003",
-                new WorkoutSession("WS004", LocalDate.now().minusDays(3),
-                    WorkoutType.STRENGTH, List.of(e2), 35, "Heavy pull day"));
-            service.addWorkoutToUser("U003",
-                new WorkoutSession("WS005", LocalDate.now().minusDays(4),
-                    WorkoutType.HIIT, List.of(e3), 25, "Rowing intervals"));
-        }
-
         var sessions = u.getWorkoutHistory();
         var analytics = new AnalyticsService();
 
-        System.out.println("Running " + 6 + " analytics tasks concurrently...");
-        System.out.println();
+        System.out.println("Running 6 analytics tasks concurrently...\n");
 
         List<AnalyticsService.AnalyticsResult> results =
                 analytics.runConcurrentAnalytics(sessions);
@@ -162,7 +142,7 @@ public class FitnessTrackerMain {
         System.out.println("  Calories burned by workout type (groupingBy):");
         analytics.caloriesByType(sessions)
                  .forEach((type, cal) ->
-                     System.out.printf("    %-12s : %.0f kcal%n", type, cal));
+                     System.out.printf("    %-50s : %.0f kcal%n", type, cal));
     }
 
     // ----------------------------------------------------------------
@@ -279,6 +259,9 @@ public class FitnessTrackerMain {
         Exercise cardio2 = new CardioExercise("Evening Jog", 20, 3.5, 130);
         Exercise strength1 = new StrengthExercise("Bench Press", 25, 4, 10, 60.0);
         Exercise strength2 = new StrengthExercise("Squats", 20, 5, 8, 80.0);
+        Exercise cardio3 = new CardioExercise("Cycling", 40, 15.0, 140);
+        Exercise strength3 = new StrengthExercise("Deadlift", 35, 5, 5, 100.0);
+        Exercise hiit1 = new CardioExercise("Rowing Intervals", 25, 0, 150);
 
         System.out.println(Exercise.getGeneralAdvice());
         System.out.println(cardio1.getExerciseInfo());
@@ -289,16 +272,25 @@ public class FitnessTrackerMain {
         var session1 = new WorkoutSession(
             "WS001", LocalDate.now(), WorkoutType.CARDIO,
             List.of(cardio1, cardio2), 50, "Great morning workout!");
+        var session2 = new WorkoutSession(
+            "WS002", LocalDate.now().minusDays(1), WorkoutType.STRENGTH,
+            List.of(strength1, strength2), 45, "Leg day complete");
+        var session3 = new WorkoutSession(
+            "WS003", LocalDate.now().minusDays(2), WorkoutType.CARDIO,
+            List.of(cardio3), 40, "Cycling session");
+        var session4 = new WorkoutSession(
+            "WS004", LocalDate.now().minusDays(3), WorkoutType.STRENGTH,
+            List.of(strength3), 35, "Heavy pull day");
+        var session5 = new WorkoutSession(
+            "WS005", LocalDate.now().minusDays(4), WorkoutType.HIIT,
+            List.of(hiit1), 25, "Rowing intervals");
 
         System.out.println(session1.getSummary());
         System.out.println("Total Calories: " + session1.calculateTotalCalories());
         System.out.println();
 
-        var session2 = new WorkoutSession(
-            "WS002", LocalDate.now().minusDays(1), WorkoutType.STRENGTH,
-            List.of(strength1, strength2), 45, "Leg day complete");
-
-        user.addWorkoutSessions(session1, session2);
+        // Add all 5 sessions — available for sorting, concurrency, NIO2 demos
+        user.addWorkoutSessions(session1, session2, session3, session4, session5);
 
         var goal = new FitnessGoal("Weight Loss", 10.0, 3.5,
                 LocalDate.now().plusMonths(3), false);

@@ -1,0 +1,6 @@
+sessionId,userId,date,durationMinutes,caloriesBurned,workoutType,notes
+WS001,U003,2026-04-06,50,825,CARDIO,Great morning workout!
+WS002,U003,2026-04-05,45,590,STRENGTH,Leg day complete
+WS003,U003,2026-04-04,40,1070,CARDIO,Cycling session
+WS004,U003,2026-04-03,35,460,STRENGTH,Heavy pull day
+WS005,U003,2026-04-02,25,200,HIIT,Rowing intervals
